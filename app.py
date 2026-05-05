@@ -11,7 +11,7 @@ st.title("📄 Document Question Answering Bot")
 API_KEY = "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"
 
 # Use smaller model for faster response
-API_URL = "API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base""
+API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
 
 headers = {
     "Authorization": f"Bearer {API_KEY}"
