@@ -2,10 +2,10 @@ import streamlit as st
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
 from langchain.chains.question_answering import load_qa_chain
-from langchain.llms import HuggingFaceHub
-import os
+from langchain.llms import HuggingFacePipeline
+from transformers import pipeline
 
 st.set_page_config(page_title="Document QA Bot")
 st.title("📄 Document Question Answering Bot")
@@ -22,30 +22,42 @@ if uploaded_file:
     docs = loader.load()
 
     # Split text
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500,
+        chunk_overlap=50
+    )
     chunks = splitter.split_documents(docs)
 
     # Embeddings
     embeddings = HuggingFaceEmbeddings()
 
-    # Vector store
-    db = FAISS.from_documents(chunks, embeddings)
+    # Vector store (Chroma instead of FAISS)
+    db = Chroma.from_documents(chunks, embeddings)
 
-    st.success("Document processed! Ask your question below 👇")
+    st.success("✅ Document processed! Ask your question below 👇")
 
     query = st.text_input("Ask a question")
 
     if query:
-        docs = db.similarity_search(query)
+        # Retrieve similar docs
+        retrieved_docs = db.similarity_search(query)
 
-        # Use HuggingFace model (free)
-        llm = HuggingFaceHub(
-            repo_id="google/flan-t5-base",
-            model_kwargs={"temperature": 0.5, "max_length": 512}
+        # Load local HuggingFace model
+        pipe = pipeline(
+            "text2text-generation",
+            model="google/flan-t5-base",
+            max_length=512
         )
 
-        chain = load_qa_chain(llm, chain_type="stuff")
-        answer = chain.run(input_documents=docs, question=query)
+        llm = HuggingFacePipeline(pipeline=pipe)
 
-        st.write("### Answer:")
-        st.write(answer)
+        # QA Chain
+        chain = load_qa_chain(llm, chain_type="stuff")
+
+        result = chain.invoke({
+            "input_documents": retrieved_docs,
+            "question": query
+        })
+
+        st.write("### 📌 Answer:")
+        st.write(result["output_text"])
