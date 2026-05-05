@@ -1,14 +1,23 @@
 import streamlit as st
+import requests
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain.chains.question_answering import load_qa_chain
-from langchain.llms import HuggingFacePipeline
-from transformers import pipeline
 
 st.set_page_config(page_title="Document QA Bot")
 st.title("📄 Document Question Answering Bot")
+
+# 🔑 Add your Hugging Face API key here
+API_KEY = "your_huggingface_api_key"
+API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+
+headers = {
+    "Authorization": f"Bearer {API_KEY}"
+}
+
+# Function to query model
+def query_hf(payload):
+    response = requests.post(API_URL, headers=headers, json=payload)
+    return response.json()
 
 # Upload PDF
 uploaded_file = st.file_uploader("Upload your PDF", type="pdf")
@@ -28,36 +37,28 @@ if uploaded_file:
     )
     chunks = splitter.split_documents(docs)
 
-    # Embeddings
-    embeddings = HuggingFaceEmbeddings()
-
-    # Vector store (Chroma instead of FAISS)
-    db = Chroma.from_documents(chunks, embeddings)
-
     st.success("✅ Document processed! Ask your question below 👇")
 
     query = st.text_input("Ask a question")
 
     if query:
-        # Retrieve similar docs
-        retrieved_docs = db.similarity_search(query)
+        # Simple retrieval (top chunks)
+        context = " ".join([doc.page_content for doc in chunks[:3]])
 
-        # Load local HuggingFace model
-        pipe = pipeline(
-            "text2text-generation",
-            model="google/flan-t5-base",
-            max_length=512
-        )
+        prompt = f"""
+        Answer the question based on the context below:
 
-        llm = HuggingFacePipeline(pipeline=pipe)
+        Context:
+        {context}
 
-        # QA Chain
-        chain = load_qa_chain(llm, chain_type="stuff")
+        Question:
+        {query}
+        """
 
-        result = chain.invoke({
-            "input_documents": retrieved_docs,
-            "question": query
-        })
+        result = query_hf({"inputs": prompt})
 
         st.write("### 📌 Answer:")
-        st.write(result["output_text"])
+        if isinstance(result, list):
+            st.write(result[0]["generated_text"])
+        else:
+            st.write("Error:", result)
