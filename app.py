@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 st.set_page_config(page_title="Document QA Bot")
 st.title("📄 Document Question Answering Bot")
